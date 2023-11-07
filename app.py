@@ -11,12 +11,21 @@ app = Flask(__name__)
 app.config['DEBUG'] = True
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///weather.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.app_context().push()
 
 db = SQLAlchemy(app)
 
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
+
+    def __repr__(self):
+        return '<Name %r' % self.name
+
+with app.app_context():
+    db.create_all()
+    db.session.commit()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -28,9 +37,9 @@ def index():
 
             db.session.add(new_city_obj)
             db.session.commit()
-
-    #cities = City.query.all()
-    cities = ['Boston', 'Las Vegas'] 
+    
+    with app.app_context():
+        cities = City.query.all()
 
     url = 'http://api.openweathermap.org/data/2.5/weather?q={}&units=imperial&appid=b91b86148c8617a364e0f4e6ec2ca5b3'
 
@@ -38,10 +47,10 @@ def index():
 
     for city in cities:
 
-        r = requests.get(url.format(city)).json()
+        r = requests.get(url.format(city.name)).json()
 
         weather = {
-            'city' : city,
+            'city' : city.name,
             'temperature_f' : int(r['main']['temp']),
             'temperature_c' : int((r['main']['temp'] - 32) / 1.8),
             'description' : r['weather'][0]['description'],
@@ -53,5 +62,5 @@ def index():
 
     return render_template('weather.html', weather_data=weather_data)
 
-if __name__ =='__main__':
+if __name__ == '__main__':
     app.run(debug=True)
